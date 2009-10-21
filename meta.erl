@@ -49,7 +49,7 @@ handle_call({get, Object}, _From, State) ->
                 mnesia:read({object, Object})
         end,
     {atomic, Row} = mnesia:transaction(Fun),
-    {reply, Row, State};
+    {reply, Row, State}.
 
 handle_cast(_Msg, State) -> {noreply, State}.
 handle_info(_Msg, State) -> {noreply, State}.
