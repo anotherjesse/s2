@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([get/1,
-         put/2,
+         put/3,
          stop/0,
          start_link/0]).
 
@@ -17,8 +17,8 @@ stop() ->
 get(Object) ->
     gen_server:call(?SERVER, {get, Object}, infinity).
 
-put(Object, Header) ->
-    gen_server:call(?SERVER, {put, Object, Header}, infinity).
+put(Object, Headers, Content) ->
+    gen_server:call(?SERVER, {put, Object, Headers, Content}, infinity).
 
 init([]) ->
     {ok, []}.
@@ -26,12 +26,17 @@ init([]) ->
 handle_call({stop}, _From, State) ->
     {stop, stop, State};
 
-handle_call({put, _Object, _Headers}, _From, State) ->
+handle_call({put, ObjectId, Headers, Content}, _From, State) ->
+    ok = meta:put(ObjectId, Headers),
+    ok = storage:put(ObjectId, Content),
     {reply, ok, State};
 
 handle_call({get, ObjectId}, _From, State) ->
-    Object = meta:get(ObjectId),
-    {reply, Object, State}.
+    Headers = meta:get(ObjectId),
+    File = storage:get(ObjectId),
+    io:format("Header: ~p~n", [Headers]),
+    io:format("Content: ~p~n", [File]),
+    {reply, ok, State}.
 
 handle_cast(_Msg, State) -> {noreply, State}.
 handle_info(_Msg, State) -> {noreply, State}.
