@@ -11,8 +11,7 @@ start() ->
     ok = mnesia:start(),
     io:format("Waiting on mnesia tables..\n",[]),
     mnesia:wait_for_tables([object], 30000),
-    Info = mnesia:table_info(object, all),
-    io:format("OK. Object table info: \n~w\n\n",[Info]),
+    mnesia:table_info(object, all),
     ok.
 
 stop() ->

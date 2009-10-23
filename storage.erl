@@ -11,8 +11,7 @@ start() ->
     ok = mnesia:start(),
     io:format("Waiting on mnesia tables..\n",[]),
     mnesia:wait_for_tables([files], 30000),
-    Info = mnesia:table_info(files, all),
-    io:format("OK. Files table info: \n~w\n\n", [Info]),
+    mnesia:table_info(files, all),
     ok.
 
 stop() ->
