@@ -1,6 +1,6 @@
 -module(storage).
--export([insert/2,
-         fetch/1,
+-export([insert/3,
+         fetch/2,
          first_run/0,
          start/0,
          stop/0]).
@@ -24,7 +24,8 @@ first_run() ->
                         [ {disc_copies, [node()] },
                           {attributes,
                            record_info(fields,file)} ]).
-fetch(Id) ->
+fetch(Bucket, Key) ->
+    Id = Bucket ++ "/" ++ Key,
     Fun =
         fun() ->
                 mnesia:read({file, Id})
@@ -36,7 +37,8 @@ fetch(Id) ->
             File#file.content
     end.
 
-insert(Id, Content) ->
+insert(Bucket, Key, Content) ->
+    Id = Bucket ++ "/" ++ Key,
     Fun = fun() ->
                   mnesia:write(
                     #file{ index   = Id,

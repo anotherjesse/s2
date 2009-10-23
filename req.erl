@@ -30,6 +30,7 @@ stop_http() ->
 % callback on request received
 
 handle_http(Req) ->
+    io:format("Got a request~n"),
     {abs_path, "/" ++ Uri} = Req:get(uri),
     {match, [{1, BucketLength}]} = regexp:matches(Uri, "^[^/]*"),
     Bucket = string:substr(Uri, 1, BucketLength),
@@ -43,17 +44,14 @@ handle_http(Req) ->
     io:format("Bucket: ~s Key: ~p~n", [Bucket, Key]),
     case Req:get(method) of
         'GET' ->
-            io:format("Got a request~n"),
-            {abs_path, Uri} = Req:get(uri),
-            io:format("Req is for ~s~n", [Uri]),
-            case meta:fetch(Uri) of
+            case meta:fetch(Bucket, Key) of
                 not_found ->
                     Req:respond(404, "404 not found");
                 Headers ->
-                    Req:ok(Headers, storage:fetch(Uri))
+                    Req:ok(Headers, storage:fetch(Bucket, Key))
             end;
         'PUT' ->
-            bucket:insert("bucket", deleteme),
+            bucket:insert("bucket", Bucket),
             Req:ok("success");
         _ ->
             io:format("Haven't handled ~p~n", [Req:get(method)]),
