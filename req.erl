@@ -30,6 +30,17 @@ stop_http() ->
 % callback on request received
 
 handle_http(Req) ->
+    {abs_path, "/" ++ Uri} = Req:get(uri),
+    {match, [{1, BucketLength}]} = regexp:matches(Uri, "^[^/]*"),
+    Bucket = string:substr(Uri, 1, BucketLength),
+    Key = case string:len(Uri) > BucketLength + 2 of
+              true ->
+                  string:substr(Uri, BucketLength + 2);
+              false ->
+                  none
+          end,
+
+    io:format("Bucket: ~s Key: ~p~n", [Bucket, Key]),
     case Req:get(method) of
         'GET' ->
             io:format("Got a request~n"),
