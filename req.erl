@@ -32,9 +32,12 @@ handle_http(Req) ->
     io:format("Got a request~n"),
     {abs_path, Uri} = Req:get(uri),
     io:format("Req is for ~s~n", [Uri]),
-    Headers = meta:get(Uri),
-    File = storage:get(Uri),
-    Req:ok(Headers, File).
+    case meta:get(Uri) of
+        not_found ->
+            Req:respond(404, "404 not found\n");
+        Headers ->
+            Req:ok(Headers, storage:get(Uri))
+    end.
 
 get(Object) ->
     gen_server:call(?SERVER, {get, Object}, infinity).
