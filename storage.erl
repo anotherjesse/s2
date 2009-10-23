@@ -46,11 +46,12 @@ handle_call({put, Object, Content}, _From, State) ->
 handle_call({get, Object}, _From, State) ->
     Fun =
         fun() ->
-                mnesia:read({object, Object})
+                mnesia:read({file, Object})
         end,
     {atomic, [Row]} = mnesia:transaction(Fun),
-    {object, Object, Content} = Row,
-    {reply, Content, State}.
+    {reply, Row#file.content, State}.
+%    {file, Object, Content} = Row,
+%    {reply, Content, State}.
 
 handle_cast(_Msg, State) -> {noreply, State}.
 handle_info(_Msg, State) -> {noreply, State}.

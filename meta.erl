@@ -3,6 +3,8 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([get/1,
          put/2,
+         send/2,
+         fetch/1,
          stop/0,
          first_run/0,
          start_link/0]).
@@ -23,6 +25,9 @@ get(Object) ->
 put(Object, Header) ->
     gen_server:call(?SERVER, {put, Object, Header}, infinity).
 
+send(Object, Req) ->
+    gen_server:call(?SERVER, {send, Object, Req}, infinity).
+
 init([]) ->
     ok = mnesia:start(),
     io:format("Waiting on mnesia tables..\n",[]),
@@ -34,22 +39,18 @@ init([]) ->
 handle_call({stop}, _From, State) ->
     {stop, stop, State};
 
+handle_call({send, Id, Req}, _From, State) ->
+    %% FIXME: how do I handle missing?
+    io:format("Grabbing headers for ~s~n", [Id]),
+    %%    Req:ok([{"Content-Type", "text/plain"}], Headers),
+    {reply, fetch(Id), State};
+
 handle_call({put, Object, Headers}, _From, State) ->
-    Fun = fun() ->
-                  mnesia:write(
-                    #object{ index   = Object,
-                             headers = Headers } )
-          end,
-    {atomic, Result} = mnesia:transaction(Fun),
-    {reply, Result, State};
+    ok = insert(Object, Headers),
+    {reply, ok, State};
 
 handle_call({get, Object}, _From, State) ->
-    Fun =
-        fun() ->
-                mnesia:read({object, Object})
-        end,
-    {atomic, [Row]} = mnesia:transaction(Fun),
-    {object, Object, Headers} = Row,
+    Headers = fetch(Object),
     {reply, Headers, State}.
 
 handle_cast(_Msg, State) -> {noreply, State}.
@@ -63,6 +64,8 @@ code_change(_OldVersion, State, _Extra) ->
     io:format("Reloading code for ?MODULE\n",[]),
     {ok, State}.
 
+% internal dataset calls
+
 first_run() ->
     mnesia:create_schema([node()]),
     ok = mnesia:start(),
@@ -70,3 +73,24 @@ first_run() ->
                         [ {disc_copies, [node()] },
                           {attributes,
                            record_info(fields,object)} ]).
+fetch(Id) ->
+    Fun =
+        fun() ->
+                mnesia:read({object, Id})
+        end,
+    case mnesia:transaction(Fun) of
+        {atomic, []} ->
+            not_found;
+        {atomic, [Object]} ->
+            Object#object.headers
+    end.
+
+insert(Id, Headers) ->
+    Fun = fun() ->
+                  mnesia:write(
+                    #object{ index   = Id,
+                             headers = Headers } )
+          end,
+    {atomic, Result} = mnesia:transaction(Fun),
+    Result.
+
