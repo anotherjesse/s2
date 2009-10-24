@@ -184,6 +184,14 @@ body(#c{sock = Sock, recv_timeout = RecvTimeout} = C, Req) ->
                 keep_alive ->
                     request(C, #req{peer_addr = Req#req.peer_addr, peer_port = Req#req.peer_port})
             end;
+        'DELETE' ->
+            Close = handle_get(C, Req),
+            case Close of
+                close ->
+                    gen_tcp:close(Sock);
+                keep_alive ->
+                    request(C, #req{peer_addr = Req#req.peer_addr, peer_port = Req#req.peer_port})
+            end;
         'PUT' ->
             io:format("Do the PUT~n"),
             case catch list_to_integer(Req#req.content_length) of

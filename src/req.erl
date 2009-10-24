@@ -63,6 +63,11 @@ handle(Req, {'GET', Bucket, Key}) ->
             Req:ok(Headers, storage:fetch(Bucket, Key))
     end;
 
+handle(Req, {'DELETE', Bucket, Key}) ->
+    meta:delete(Bucket, Key),
+    storage:delete(Bucket, Key),
+    Req:respond(204, "");
+
 handle(Req, {'PUT', Bucket, none}) ->
     bucket:insert(Bucket, none),
     Req:ok("success");

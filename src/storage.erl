@@ -1,6 +1,7 @@
 -module(storage).
 -export([insert/3,
          fetch/2,
+         delete/2,
          first_run/0,
          start/0,
          stop/0]).
@@ -45,3 +46,14 @@ insert(Bucket, Key, Content) ->
           end,
     {atomic, Result} = mnesia:transaction(Fun),
     Result.
+
+delete(Bucket, Key) ->
+    Id = Bucket ++ "/" ++ Key,
+    Delete=#file{ index = Id, _ = '_'},
+    Fun = fun() ->
+                  List = mnesia:match_object(Delete),
+                  lists:foreach(fun(X) ->
+                                        mnesia:delete_object(X)
+                                end, List)
+          end,
+    mnesia:transaction(Fun).
