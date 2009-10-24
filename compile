@@ -1,0 +1,12 @@
+# init
+pwd=$(dirname $0)
+
+# compile in main src/ to ebin/ dir
+echo -n "compiling... "
+erlc -o ${pwd}/ebin/ ${pwd}/src/*.erl
+echo "ok."
+
+# copy .app file
+echo -n "copying... "
+cp ${pwd}/src/s2.app ${pwd}/ebin/s2.app
+echo "ok."
