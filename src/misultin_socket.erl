@@ -184,32 +184,76 @@ body(#c{sock = Sock, recv_timeout = RecvTimeout} = C, Req) ->
                 keep_alive ->
                     request(C, #req{peer_addr = Req#req.peer_addr, peer_port = Req#req.peer_port})
             end;
+        'PUT' ->
+            io:format("Do the PUT~n"),
+            case catch list_to_integer(Req#req.content_length) of
+                {'EXIT', _} ->
+                    io:format("PUT ERROR~n"),
+                    %% TODO: provide a fallback when content length is not or wrongly specified
+                    ?DEBUG(debug, "specified content length is not a valid integer number: ~p", [Req#req.content_length]),
+                    send(Sock, misultin_utility:get_http_status_code(411)),
+                    exit(normal);
+                0 ->
+                    io:format("Handling PUT as a GET~n"),
+                    Close = handle_get(C, Req),
+                    case Close of
+                        close ->
+                            gen_tcp:close(Sock);
+                        keep_alive ->
+                            request(C, #req{peer_addr = Req#req.peer_addr, peer_port = Req#req.peer_port})
+                    end;
+                Len ->
+                    io:format("Handling PUT as a POST~n"),
+                    inet:setopts(Sock, [{packet, raw}, {active, false}]),
+                    case gen_tcp:recv(Sock, Len, RecvTimeout) of
+                        {ok, Bin} ->
+                            Close = handle_post(C, Req#req{body = Bin}),
+                            case Close of
+                                close ->
+                          gen_tcp:close(Sock);
+                                keep_alive ->
+                                    inet:setopts(Sock, [{packet, http}]),
+                                    request(C, #req{peer_addr = Req#req.peer_addr, peer_port = Req#req.peer_port})
+                            end;
+                        {error, timeout} ->
+                            ?DEBUG(debug, "request timeout, sending error", []),
+                            send(Sock, misultin_utility:get_http_status_code(408));
+                        _Other ->
+                            ?DEBUG(debug, "tcp error treating post data: ~p, send bad request error back", [_Other]),
+                            send(Sock, misultin_utility:get_http_status_code(400))
+                    end;
+                _Other ->
+                    io:format("method not implemented ~p", [_Other]),
+                    ?DEBUG(debug, "method not implemented: ~p", [_Other]),
+                    send(Sock, misultin_utility:get_http_status_code(501)),
+                    exit(normal)
+            end;
         'POST' ->
             case catch list_to_integer(Req#req.content_length) of
                 {'EXIT', _} ->
-                                                % TODO: provide a fallback when content length is not or wrongly specified
-          ?DEBUG(debug, "specified content length is not a valid integer number: ~p", [Req#req.content_length]),
-          send(Sock, misultin_utility:get_http_status_code(411)),
+                    %% TODO: provide a fallback when content length is not or wrongly specified
+                    ?DEBUG(debug, "specified content length is not a valid integer number: ~p", [Req#req.content_length]),
+                    send(Sock, misultin_utility:get_http_status_code(411)),
                     exit(normal);
                 Len ->
                     inet:setopts(Sock, [{packet, raw}, {active, false}]),
-          case gen_tcp:recv(Sock, Len, RecvTimeout) of
-              {ok, Bin} ->
-                  Close = handle_post(C, Req#req{body = Bin}),
-                  case Close of
-                      close ->
+                    case gen_tcp:recv(Sock, Len, RecvTimeout) of
+                        {ok, Bin} ->
+                            Close = handle_post(C, Req#req{body = Bin}),
+                            case Close of
+                                close ->
                           gen_tcp:close(Sock);
-                      keep_alive ->
-                          inet:setopts(Sock, [{packet, http}]),
-                          request(C, #req{peer_addr = Req#req.peer_addr, peer_port = Req#req.peer_port})
-                  end;
-              {error, timeout} ->
-                  ?DEBUG(debug, "request timeout, sending error", []),
-                  send(Sock, misultin_utility:get_http_status_code(408));
-            _Other ->
-                  ?DEBUG(debug, "tcp error treating post data: ~p, send bad request error back", [_Other]),
-                  send(Sock, misultin_utility:get_http_status_code(400))
-          end
+                                keep_alive ->
+                                    inet:setopts(Sock, [{packet, http}]),
+                                    request(C, #req{peer_addr = Req#req.peer_addr, peer_port = Req#req.peer_port})
+                            end;
+                        {error, timeout} ->
+                            ?DEBUG(debug, "request timeout, sending error", []),
+                            send(Sock, misultin_utility:get_http_status_code(408));
+                        _Other ->
+                            ?DEBUG(debug, "tcp error treating post data: ~p, send bad request error back", [_Other]),
+                            send(Sock, misultin_utility:get_http_status_code(400))
+                    end
             end;
         _Other ->
             ?DEBUG(debug, "method not implemented: ~p", [_Other]),

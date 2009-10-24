@@ -10,8 +10,8 @@
 start() ->
     ok = mnesia:start(),
     io:format("Waiting on mnesia tables..\n",[]),
-    mnesia:wait_for_tables([files], 30000),
-    mnesia:table_info(files, all),
+    mnesia:wait_for_tables([file], 30000),
+    mnesia:table_info(file, all),
     ok.
 
 stop() ->
@@ -20,7 +20,7 @@ stop() ->
 first_run() ->
     mnesia:create_schema([node()]),
     ok = mnesia:start(),
-    mnesia:create_table(files,
+    mnesia:create_table(file,
                         [ {disc_copies, [node()] },
                           {attributes,
                            record_info(fields,file)} ]).
