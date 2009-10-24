@@ -4,6 +4,7 @@
 -export([get/1,
          put/3,
          cold/0,
+         listen/0,
          stop/0,
          start_http/1,
          stop_http/0,
@@ -96,9 +97,17 @@ code_change(_OldVersion, State, _Extra) ->
     io:format("Reloading code for ?MODULE\n",[]),
     {ok, State}.
 
-cold() ->
+listen() ->
+    io:format("Setting up on 1234~n"),
     meta:start(),
     storage:start(),
     bucket:start(),
     req:start_link(),
     req:start_http(1234).
+
+cold() ->
+    io:format("Building tables~n"),
+    meta:first_run(),
+    storage:first_run(),
+    bucket:first_run(),
+    listen().

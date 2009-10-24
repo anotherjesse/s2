@@ -8,5 +8,5 @@ echo "ok."
 
 # copy .app file
 echo -n "copying... "
-cp ${pwd}/src/s2.app ${pwd}/ebin/s2.app
+cp ${pwd}/src/*.app ${pwd}/ebin/
 echo "ok."
