@@ -39,6 +39,7 @@ class S3ConnectionTest (unittest.TestCase):
         c = S3Connection(aws_secret_access_key="foo",
                          aws_access_key_id="bar",
                          is_secure=False,
+                         debug=2,
                          port=1234,
                          host="localhost",
                          calling_format=boto.s3.connection.OrdinaryCallingFormat())

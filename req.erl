@@ -40,24 +40,27 @@ handle_http(Req) ->
               false ->
                   none
           end,
-
     io:format("Bucket: ~s Key: ~p~n", [Bucket, Key]),
-    case Req:get(method) of
-        'GET' ->
-            case meta:fetch(Bucket, Key) of
-                not_found ->
-                    Req:respond(404, "404 not found");
-                Headers ->
-                    Req:ok(Headers, storage:fetch(Bucket, Key))
-            end;
-        'PUT' ->
-            bucket:insert("bucket", Bucket),
-            Req:ok("success");
-        _ ->
-            io:format("Haven't handled ~p~n", [Req:get(method)]),
-            Req:ok("hmm")
-    end.
+    handle(Req, {Req:get(method), Bucket, Key}).
 
+
+handle(Req, {'GET', _Bucket, none}) ->
+    Req:respond(501, "Handle bucket request");
+
+handle(Req, {'GET', Bucket, Key}) ->
+    case meta:fetch(Bucket, Key) of
+        not_found ->
+            Req:respond(404, "404 not found");
+        Headers ->
+            Req:send_object(Req, Headers, storage:fetch(Bucket, Key))
+    end;
+
+handle(Req, {'PUT', Bucket, none}) ->
+    bucket:insert(Bucket, none),
+    Req:ok("success");
+
+handle(Req, {Method, Bucket, Key}) ->
+    Req:respond(501, io_lib:format("Haven't handled ~p ~p ~p~n", [Method, Bucket, Key])).
 
 get(Object) ->
     gen_server:call(?SERVER, {get, Object}, infinity).

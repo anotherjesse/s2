@@ -26,10 +26,9 @@ first_run() ->
                            record_info(fields,file)} ]).
 fetch(Bucket, Key) ->
     Id = Bucket ++ "/" ++ Key,
-    Fun =
-        fun() ->
-                mnesia:read({file, Id})
-        end,
+    Fun = fun() ->
+                  mnesia:read({file, Id})
+          end,
     case mnesia:transaction(Fun) of
         {atomic, []} ->
             not_found;
