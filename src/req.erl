@@ -60,7 +60,7 @@ handle(Req, {'GET', Bucket, Key}) ->
         not_found ->
             Req:respond(404, "404 not found");
         Headers ->
-            Req:send_object(Req, Headers, storage:fetch(Bucket, Key))
+            Req:ok(Headers, storage:fetch(Bucket, Key))
     end;
 
 handle(Req, {'PUT', Bucket, none}) ->
@@ -72,7 +72,7 @@ handle(Req, {'PUT', Bucket, Key}) ->
     Content = Req:get(body),
     storage:insert(Bucket, Key, Content),
     MD5 = md5_hex(Content),
-    Req:ok([{"ETag", MD5}], "success");
+    Req:ok([{"ETag", "\"" ++ MD5 ++ "\""}], "success");
 
 handle(Req, {Method, Bucket, Key}) ->
     Req:respond(501, io_lib:format("Haven't handled ~p ~p ~p~n", [Method, Bucket, Key])).
