@@ -51,22 +51,29 @@ handle_http(Req) ->
 
 handle(Req, {'GET', Bucket, none}) ->
     Prefix = lists:flatten([ Y || {"prefix",Y} <- Req:parse_qs()]),
-    io:format("Query: ~s~n", [Prefix]),
+    Delimiter = lists:flatten([ Y || {"delimiter",Y} <- Req:parse_qs()]),
+    io:format("Prefix: ~s Delimiter: ~s~n", [Prefix, Delimiter]),
     case bucket:fetch(Bucket) of
         not_found ->
             Req:respond(404, "No Such Bucket");
         _ ->
-            Contents = lists:flatten([["<Contents><Key>",
-                                       Obj#object.key,
-                                       "</Key></Contents>"] || Obj <- meta:list(Bucket, Prefix)]),
+            [Keys, CommonPrefixes] = meta:list(Bucket, Prefix, Delimiter),
+            KeysXML = [["<Contents><Key>",
+                        Obj#object.key,
+                        "</Key></Contents>"] || Obj <- Keys],
+            CommonPrefixesXML = [["<CommonPrefixes><Prefix>",
+                                  CP,
+                                  "</Prefix></CommonPrefixes>"] || CP <- CommonPrefixes],
             Req:ok(lists:flatten(["<?xml version='1.0' encoding='UTF-8'?>",
                                   "<ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'>",
                                   "<Name>", Bucket, "</Name>",
-                                  "<Prefix></Prefix>",
+                                  "<Prefix>", Prefix, "</Prefix>",
+                                  "<Delimiter>", Delimiter, "</Delimiter>",
                                   "<Marker></Marker>",
-                                  "<MaxKeys>0</MaxKeys>",
+                                  "<MaxKeys>1000</MaxKeys>",
                                   "<IsTruncated>false</IsTruncated>",
-                                  Contents,
+                                  KeysXML,
+                                  CommonPrefixesXML,
                                   "</ListBucketResult>"]))
     end;
 

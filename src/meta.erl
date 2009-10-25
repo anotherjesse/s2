@@ -1,6 +1,6 @@
 -module(meta).
 -export([insert/3,
-         list/2,
+         list/3,
          fetch/1,
          fetch/2,
          delete/2,
@@ -33,14 +33,26 @@ fetch(Bucket) ->
         fun() ->
             mnesia:match_object({object, '_', Bucket, '_', '_' } )
         end,
-    {atomic, Results} = mnesia:transaction( Fun),
+    {atomic, Results} = mnesia:transaction(Fun),
     Results.
 
-list(Bucket, []) ->
-    fetch(Bucket);
+list(Bucket, [], []) ->
+    [fetch(Bucket), []];
 
-list(Bucket, Prefix) ->
-    [Obj || Obj <- fetch(Bucket), string:str(Obj#object.key, Prefix) == 1 ].
+list(Bucket, [], Delimiter) ->
+    extract_common_prefixes(list(Bucket, [], []), Delimiter);
+
+list(Bucket, Prefix, []) ->
+    [[Obj || Obj <- fetch(Bucket), string:str(Obj#object.key, Prefix) == 1 ],
+     []];
+
+list(Bucket, Prefix, Delimiter) ->
+    extract_common_prefixes(hd(list(Bucket, Prefix, [])), Delimiter).
+
+extract_common_prefixes(Keys, Delimiter) ->
+    {NoPrefix, Prefixed} = lists:partition(fun(A) -> string:str(A#object.key, Delimiter) == 0 end, Keys),
+    [NoPrefix,
+     lists:usort([hd(string:tokens(Key#object.key, Delimiter)) || Key <- Prefixed])].
 
 fetch(Bucket, Key) ->
     Id = Bucket ++ "/" ++ Key,
