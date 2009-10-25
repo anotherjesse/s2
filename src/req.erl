@@ -87,7 +87,7 @@ handle(Req, {'GET', Bucket, none}) ->
 handle(Req, {'GET', Bucket, Key}) ->
     case meta:fetch(Bucket, Key) of
         not_found ->
-            Req:respond(404, "404 not found");
+            Req:respond(404, "");
         Headers ->
             Req:ok(Headers, storage:fetch(Bucket, Key))
     end;
@@ -95,7 +95,7 @@ handle(Req, {'GET', Bucket, Key}) ->
 handle(Req, {'HEAD', Bucket, Key}) ->
     case meta:fetch(Bucket, Key) of
         not_found ->
-            Req:respond(404, "404 not found");
+            Req:respond(404, "");
         Headers ->
             Req:ok(Headers, "")
     end;
@@ -110,9 +110,9 @@ handle(Req, {'PUT', Bucket, none}) ->
     Req:ok("success");
 
 handle(Req, {'PUT', Bucket, Key}) ->
-    io:format("before~n"),
-    Headers = valid_headers(Req:get(headers)),
-    io:format("after~n"),
+    io:format("Original Headers: ~p~n", [Req:get(headers)]),
+    Headers = lists:flatten([extract(K,V) || {K,V} <- Req:get(headers)]),
+    io:format("Saved Headers: ~p~n", [Headers]),
     meta:insert(Bucket, Key, Headers),
     Content = Req:get(body),
     storage:insert(Bucket, Key, Content),
@@ -186,5 +186,14 @@ hex(N) when N < 10 ->
 hex(N) when N >= 10, N < 16 ->
     $a + (N-10).
 
-valid_headers(Headers) ->
-    [{K,V} || {K,V} <- Headers, K == 'Content-Type'].
+
+% FIXME: misultin messes with header names
+
+extract('Content-Type', V) ->
+    {'Content-Type', V};
+
+extract("X-Amz-Meta-" ++ K, V) ->
+    {"x-amz-meta-" ++ K, V};
+
+extract(_,_) ->
+    [].
