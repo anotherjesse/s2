@@ -12,6 +12,8 @@
          handle_http/1,
          start_link/0]).
 
+-include("s2.hrl").
+
 -define(SERVER, global:whereis_name(?MODULE)).
 
 start_link() ->
@@ -52,7 +54,8 @@ handle(Req, {'GET', Bucket, none}) ->
         not_found ->
             Req:respond(404, "No Such Bucket");
         _ ->
-            Req:ok(io_lib:format("<?xml version='1.0' encoding='UTF-8'?><ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'><Name>~s</Name><Prefix></Prefix><Marker></Marker><MaxKeys>0</MaxKeys><IsTruncated>false</IsTruncated><Contents></Contents></ListBucketResult>", [Bucket]))
+            Contents = string:join([io_lib:format("<Contents><Key>~p</Key></Contents>", [Obj#object.key]) || Obj <- meta:fetch(Bucket)], ""),
+            Req:ok(io_lib:format("<?xml version='1.0' encoding='UTF-8'?><ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'><Name>~s</Name><Prefix></Prefix><Marker></Marker><MaxKeys>0</MaxKeys><IsTruncated>false</IsTruncated>~s</ListBucketResult>", [Bucket, Contents]))
     end;
 
 handle(Req, {'GET', Bucket, Key}) ->

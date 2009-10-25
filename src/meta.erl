@@ -7,10 +7,7 @@
          start/0,
          stop/0]).
 
--record(object, {index,
-                 bucket,
-                 key,
-                 headers}).
+-include("s2.hrl").
 
 start() ->
     ok = mnesia:start(),
