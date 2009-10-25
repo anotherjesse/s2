@@ -40,7 +40,7 @@ list(Bucket, [], []) ->
     [fetch(Bucket), []];
 
 list(Bucket, [], Delimiter) ->
-    extract_common_prefixes(list(Bucket, [], []), Delimiter);
+    extract_common_prefixes(hd(list(Bucket, [], [])), Delimiter);
 
 list(Bucket, Prefix, []) ->
     [[Obj || Obj <- fetch(Bucket), string:str(Obj#object.key, Prefix) == 1 ],
