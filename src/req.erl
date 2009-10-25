@@ -92,6 +92,14 @@ handle(Req, {'GET', Bucket, Key}) ->
             Req:ok(Headers, storage:fetch(Bucket, Key))
     end;
 
+handle(Req, {'HEAD', Bucket, Key}) ->
+    case meta:fetch(Bucket, Key) of
+        not_found ->
+            Req:respond(404, "404 not found");
+        Headers ->
+            Req:ok(Headers, "")
+    end;
+
 handle(Req, {'DELETE', Bucket, Key}) ->
     meta:delete(Bucket, Key),
     storage:delete(Bucket, Key),
@@ -102,7 +110,10 @@ handle(Req, {'PUT', Bucket, none}) ->
     Req:ok("success");
 
 handle(Req, {'PUT', Bucket, Key}) ->
-    meta:insert(Bucket, Key, []),
+    io:format("before~n"),
+    Headers = valid_headers(Req:get(headers)),
+    io:format("after~n"),
+    meta:insert(Bucket, Key, Headers),
     Content = Req:get(body),
     storage:insert(Bucket, Key, Content),
     MD5 = md5_hex(Content),
@@ -174,3 +185,6 @@ hex(N) when N < 10 ->
     $0+N;
 hex(N) when N >= 10, N < 16 ->
     $a + (N-10).
+
+valid_headers(Headers) ->
+    [{K,V} || {K,V} <- Headers, K == 'Content-Type'].
