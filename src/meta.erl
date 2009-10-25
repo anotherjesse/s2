@@ -1,5 +1,6 @@
 -module(meta).
 -export([insert/3,
+         list/2,
          fetch/1,
          fetch/2,
          delete/2,
@@ -35,6 +36,11 @@ fetch(Bucket) ->
     {atomic, Results} = mnesia:transaction( Fun),
     Results.
 
+list(Bucket, []) ->
+    fetch(Bucket);
+
+list(Bucket, Prefix) ->
+    [Obj || Obj <- fetch(Bucket), string:str(Obj#object.key, Prefix) == 1 ].
 
 fetch(Bucket, Key) ->
     Id = Bucket ++ "/" ++ Key,

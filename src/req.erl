@@ -50,13 +50,15 @@ handle_http(Req) ->
 
 
 handle(Req, {'GET', Bucket, none}) ->
+    Prefix = lists:flatten([ Y || {"prefix",Y} <- Req:parse_qs()]),
+    io:format("Query: ~s~n", [Prefix]),
     case bucket:fetch(Bucket) of
         not_found ->
             Req:respond(404, "No Such Bucket");
         _ ->
             Contents = lists:flatten([["<Contents><Key>",
                                        Obj#object.key,
-                                       "</Key></Contents>"] || Obj <- meta:fetch(Bucket)]),
+                                       "</Key></Contents>"] || Obj <- meta:list(Bucket, Prefix)]),
             Req:ok(lists:flatten(["<?xml version='1.0' encoding='UTF-8'?>",
                                   "<ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'>",
                                   "<Name>", Bucket, "</Name>",
