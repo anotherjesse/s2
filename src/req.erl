@@ -6,7 +6,6 @@
          first_run/0,
          start/0,
          stop/0,
-         md5_hex/1,
          start_http/1,
          stop_http/0,
          handle_http/1,
@@ -35,7 +34,6 @@ stop_http() ->
 
 handle_http(Req) ->
     Method = Req:get(method),
-    io:format("req: ~p~n", [Req:get(uri)]),
     {abs_path, "/" ++ Uri} = Req:get(uri),
     case Uri of
         [] ->
@@ -55,7 +53,8 @@ handle_http(Req) ->
     handle(Req, {Method, Bucket, Key}).
 
 handle(Req, {'GET', none, none}) ->
-    Req:ok(lists:flatten(["<ListAllMyBucketsResult xmlns='http://doc.s3.amazonaws.com/2006-03-01'>",
+    Req:ok([{'Content-Type', 'text/xml'}],
+           lists:flatten(["<ListAllMyBucketsResult xmlns='http://doc.s3.amazonaws.com/2006-03-01'>",
                           "<Owner><ID>foo</ID><DisplayName>bar</DisplayName></Owner>",
                           "<Buckets>",
                            [["<Bucket>",
@@ -88,8 +87,8 @@ handle(Req, {'GET', Bucket, none}) ->
             CommonPrefixesXML = [["<CommonPrefixes><Prefix>",
                                   CP,
                                   "</Prefix></CommonPrefixes>"] || CP <- CommonPrefixes],
-            Req:ok(lists:flatten(["<?xml version='1.0' encoding='UTF-8'?>",
-                                  "<ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'>",
+            Req:ok([{"Content-Type", "text/xml"}],
+                   lists:flatten(["<ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'>",
                                   "<Name>", Bucket, "</Name>",
                                   "<Prefix>", Prefix, "</Prefix>",
                                   "<Delimiter>", Delimiter, "</Delimiter>",
@@ -131,14 +130,11 @@ handle(Req, {'PUT', Bucket, none}) ->
     Req:ok("success");
 
 handle(Req, {'PUT', Bucket, Key}) ->
-    io:format("Original Headers: ~p~n", [Req:get(headers)]),
     Headers = lists:flatten([extract(K,V) || {K,V} <- Req:get(headers)]),
-    io:format("Saved Headers: ~p~n", [Headers]),
     meta:insert(Bucket, Key, Headers),
     Content = Req:get(body),
     storage:insert(Bucket, Key, Content),
-    MD5 = md5_hex(Content),
-    Req:ok([{"ETag", "\"" ++ MD5 ++ "\""}], "success");
+    Req:ok([{"ETag", "\"" ++ md5:hex_digest(Content) ++ "\""}], "success");
 
 handle(Req, {Method, Bucket, Key}) ->
     Req:respond(501, io_lib:format("Haven't handled ~p ~p ~p~n", [Method, Bucket, Key])).
@@ -153,19 +149,8 @@ init([]) ->
     {ok, []}.
 
 handle_call({stop}, _From, State) ->
-    {stop, stop, State};
+    {stop, stop, State}.
 
-handle_call({put, ObjectId, Headers, Content}, _From, State) ->
-    ok = meta:put(ObjectId, Headers),
-    ok = storage:put(ObjectId, Content),
-    {reply, ok, State};
-
-handle_call({get, ObjectId}, _From, State) ->
-    Pid = proc_lib:spawn_link(meta, get, [ObjectId]),
-    File = storage:get(ObjectId),
-    io:format("Header: ~p~n", [Pid]),
-    io:format("Content: ~p~n", [File]),
-    {reply, ok, State}.
 
 handle_cast(_Msg, State) -> {noreply, State}.
 handle_info(_Msg, State) -> {noreply, State}.
@@ -183,30 +168,13 @@ start() ->
     bucket:start(),
     req:start_link(),
     req:start_http(1234),
-    io:format("Setting up on 1234~n").
+    io:format("Listening on 1234~n").
 
 first_run() ->
     io:format("Building tables~n"),
     meta:first_run(),
     storage:first_run(),
     bucket:first_run().
-
-md5_hex(S) ->
-       Md5_bin =  erlang:md5(S),
-       Md5_list = binary_to_list(Md5_bin),
-       lists:flatten(list_to_hex(Md5_list)).
-
-list_to_hex(L) ->
-    lists:map(fun(X) -> int_to_hex(X) end, L).
-
-int_to_hex(N) when N < 256 ->
-    [hex(N div 16), hex(N rem 16)].
-
-hex(N) when N < 10 ->
-    $0+N;
-hex(N) when N >= 10, N < 16 ->
-    $a + (N-10).
-
 
 % FIXME: misultin messes with header names
 
