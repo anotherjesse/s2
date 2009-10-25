@@ -52,7 +52,7 @@ handle(Req, {'GET', Bucket, none}) ->
         not_found ->
             Req:respond(404, "No Such Bucket");
         _ ->
-            Req:ok(io_lib:format("<?xml version='1.0' encoding='UTF-8'?><ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'><Name>~s</Name><Prefix></Prefix><Marker></Marker><MaxKeys>0</MaxKeys><IsTruncated>false</IsTruncated><Contents /></ListBucketResult>", [Bucket]))
+            Req:ok(io_lib:format("<?xml version='1.0' encoding='UTF-8'?><ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'><Name>~s</Name><Prefix></Prefix><Marker></Marker><MaxKeys>0</MaxKeys><IsTruncated>false</IsTruncated><Contents></Contents></ListBucketResult>", [Bucket]))
     end;
 
 handle(Req, {'GET', Bucket, Key}) ->

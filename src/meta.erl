@@ -1,12 +1,16 @@
 -module(meta).
 -export([insert/3,
+         fetch/1,
          fetch/2,
          delete/2,
          first_run/0,
          start/0,
          stop/0]).
 
--record(object, {index, headers}).
+-record(object, {index,
+                 bucket,
+                 key,
+                 headers}).
 
 start() ->
     ok = mnesia:start(),
@@ -25,6 +29,16 @@ first_run() ->
                         [ {disc_copies, [node()] },
                           {attributes,
                            record_info(fields,object)} ]).
+
+fetch(Bucket) ->
+    Fun =
+        fun() ->
+            mnesia:match_object({object, '_', Bucket, '_', '_' } )
+        end,
+    {atomic, Results} = mnesia:transaction( Fun),
+    Results.
+
+
 fetch(Bucket, Key) ->
     Id = Bucket ++ "/" ++ Key,
     Fun =
@@ -43,6 +57,8 @@ insert(Bucket, Key, Headers) ->
     Fun = fun() ->
                   mnesia:write(
                     #object{ index   = Id,
+                             bucket  = Bucket,
+                             key     = Key,
                              headers = Headers } )
           end,
     {atomic, Result} = mnesia:transaction(Fun),
