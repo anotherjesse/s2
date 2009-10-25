@@ -52,7 +52,7 @@ list(Bucket, Prefix, Delimiter) ->
 extract_common_prefixes(Keys, Delimiter) ->
     {NoPrefix, Prefixed} = lists:partition(fun(A) -> string:str(A#object.key, Delimiter) == 0 end, Keys),
     [NoPrefix,
-     lists:usort([hd(string:tokens(Key#object.key, Delimiter)) || Key <- Prefixed])].
+     lists:usort([hd(string:tokens(Key#object.key, Delimiter)) ++ Delimiter || Key <- Prefixed])].
 
 fetch(Bucket, Key) ->
     Id = Bucket ++ "/" ++ Key,

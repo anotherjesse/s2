@@ -48,11 +48,18 @@ handle_http(Req) ->
     io:format("Method: ~p Bucket: ~s Key: ~p~n", [Method, Bucket, Key]),
     handle(Req, {Method, Bucket, Key}).
 
-
+% note: amazon seems to crop max-keys before computing common prefixes
+% fixme: add test for dealing with delimiter being first char of key
 handle(Req, {'GET', Bucket, none}) ->
     Prefix = lists:flatten([ Y || {"prefix",Y} <- Req:parse_qs()]),
     Delimiter = lists:flatten([ Y || {"delimiter",Y} <- Req:parse_qs()]),
-    io:format("Prefix: ~s Delimiter: ~s~n", [Prefix, Delimiter]),
+    MaxKeys = case lists:flatten([ Y || {"max-keys",Y} <- Req:parse_qs()]) of
+                  [] ->
+                      1000;
+                  N ->
+                      list_to_integer(N)
+              end,
+    io:format("Prefix: ~s Delimiter: ~s MaxKeys ~p~n", [Prefix, Delimiter, MaxKeys]),
     case bucket:fetch(Bucket) of
         not_found ->
             Req:respond(404, "No Such Bucket");
@@ -60,7 +67,7 @@ handle(Req, {'GET', Bucket, none}) ->
             [Keys, CommonPrefixes] = meta:list(Bucket, Prefix, Delimiter),
             KeysXML = [["<Contents><Key>",
                         Obj#object.key,
-                        "</Key></Contents>"] || Obj <- Keys],
+                        "</Key></Contents>"] || Obj <- lists:sublist(Keys, MaxKeys)],
             CommonPrefixesXML = [["<CommonPrefixes><Prefix>",
                                   CP,
                                   "</Prefix></CommonPrefixes>"] || CP <- CommonPrefixes],
