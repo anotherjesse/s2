@@ -100,6 +100,10 @@ handle(Req, {'HEAD', Bucket, Key}) ->
             Req:ok(Headers, "")
     end;
 
+handle(Req, {'DELETE', Bucket, none}) ->
+    bucket:delete(Bucket),
+    Req:respond(204, "");
+
 handle(Req, {'DELETE', Bucket, Key}) ->
     meta:delete(Bucket, Key),
     storage:delete(Bucket, Key),
