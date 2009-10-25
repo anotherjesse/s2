@@ -31,7 +31,7 @@ first_run() ->
 fetch(Bucket) ->
     Fun =
         fun() ->
-            mnesia:match_object({object, '_', Bucket, '_', '_' } )
+            mnesia:match_object({object, '_', Bucket, '_', '_', '_', '_', '_' } )
         end,
     {atomic, Results} = mnesia:transaction(Fun),
     Results.
@@ -67,14 +67,18 @@ fetch(Bucket, Key) ->
             Object#object.headers
     end.
 
-insert(Bucket, Key, Headers) ->
+insert(Bucket, Key, Req) ->
     Id = Bucket ++ "/" ++ Key,
     Fun = fun() ->
                   mnesia:write(
                     #object{ index   = Id,
                              bucket  = Bucket,
                              key     = Key,
-                             headers = Headers } )
+                             etag    = md5:hex_digest(Req:get(body)),
+                             size    = Req:get(content_length),
+                             last_modified = calendar:universal_time(),
+                             headers = lists:flatten([extract(K,V) || {K,V} <- Req:get(headers)])
+                            })
           end,
     {atomic, Result} = mnesia:transaction(Fun),
     Result.
@@ -89,3 +93,22 @@ delete(Bucket, Key) ->
                                 end, List)
           end,
     mnesia:transaction(Fun).
+
+%% Extract only headers we care about
+
+% FIXME: misultin messes with header names
+
+extract('Content-Type', V) ->
+    {'Content-Type', V};
+
+extract('Date', V) ->
+    {'Date', V};
+
+extract('Content-Md5', V) ->
+    {'Content-Md5', V};
+
+extract("X-Amz-Meta-" ++ K, V) ->
+    {"x-amz-meta-" ++ K, V};
+
+extract(_,_) ->
+    [].

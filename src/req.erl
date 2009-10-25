@@ -49,7 +49,7 @@ handle_http(Req) ->
                           none
                   end
     end,
-    io:format("Method: ~p Bucket: ~s Key: ~p~n", [Method, Bucket, Key]),
+    io:format("Method: ~s Bucket: ~s Key: ~p~n", [Method, Bucket, Key]),
     handle(Req, {Method, Bucket, Key}).
 
 handle(Req, {'GET', none, none}) ->
@@ -81,14 +81,18 @@ handle(Req, {'GET', Bucket, none}) ->
             Req:respond(404, "No Such Bucket");
         _ ->
             [Keys, CommonPrefixes] = meta:list(Bucket, Prefix, Delimiter),
-            KeysXML = [["<Contents><Key>",
-                        Obj#object.key,
-                        "</Key></Contents>"] || Obj <- lists:sublist(Keys, MaxKeys)],
+            KeysXML = [["<Contents>",
+                        "<Key>", Obj#object.key, "</Key>",
+                        "<LastModified>", date_fmt(Obj#object.last_modified), "</LastModified>",
+                        "<ETag>&quot;", Obj#object.etag, "&quot;</ETag>",
+                        "<Size>", Obj#object.size, "</Size>",
+                        "</Contents>"] || Obj <- lists:sublist(Keys, MaxKeys)],
             CommonPrefixesXML = [["<CommonPrefixes><Prefix>",
                                   CP,
                                   "</Prefix></CommonPrefixes>"] || CP <- CommonPrefixes],
             Req:ok([{"Content-Type", "text/xml"}],
-                   lists:flatten(["<ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'>",
+                   lists:flatten(["<?xml version='1.0' encoding='UTF-8'?>",
+                                  "<ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'>",
                                   "<Name>", Bucket, "</Name>",
                                   "<Prefix>", Prefix, "</Prefix>",
                                   "<Delimiter>", Delimiter, "</Delimiter>",
@@ -130,8 +134,7 @@ handle(Req, {'PUT', Bucket, none}) ->
     Req:ok("success");
 
 handle(Req, {'PUT', Bucket, Key}) ->
-    Headers = lists:flatten([extract(K,V) || {K,V} <- Req:get(headers)]),
-    meta:insert(Bucket, Key, Headers),
+    meta:insert(Bucket, Key, Req),
     Content = Req:get(body),
     storage:insert(Bucket, Key, Content),
     Req:ok([{"ETag", "\"" ++ md5:hex_digest(Content) ++ "\""}], "success");
@@ -176,19 +179,8 @@ first_run() ->
     storage:first_run(),
     bucket:first_run().
 
-% FIXME: misultin messes with header names
 
-extract('Content-Type', V) ->
-    {'Content-Type', V};
-
-extract('Date', V) ->
-    {'Date', V};
-
-extract('Content-Md5', V) ->
-    {'Content-Md5', V};
-
-extract("X-Amz-Meta-" ++ K, V) ->
-    {"x-amz-meta-" ++ K, V};
-
-extract(_,_) ->
-    [].
+date_fmt(DateTime) ->
+    {{Year,Month,Day},{Hour,Min,Sec}} = DateTime,
+    io_lib:format("~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.000Z",
+        [Year, Month, Day, Hour, Min, Sec]).
