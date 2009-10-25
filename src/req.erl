@@ -35,18 +35,35 @@ stop_http() ->
 
 handle_http(Req) ->
     Method = Req:get(method),
+    io:format("req: ~p~n", [Req:get(uri)]),
     {abs_path, "/" ++ Uri} = Req:get(uri),
-    {match, [{1, BucketLength}]} = regexp:matches(Uri, "^[^/]*"),
-    Bucket = string:substr(Uri, 1, BucketLength),
-    Key = case string:len(Uri) > BucketLength + 2 of
-              true ->
-                  string:substr(Uri, BucketLength + 2);
-              false ->
-                  none
-          end,
-
+    case Uri of
+        [] ->
+            Bucket = none,
+            Key = none;
+        _ ->
+            {match, [{1, BucketLength}]} = regexp:matches(Uri, "^[^/]*"),
+            Bucket = string:substr(Uri, 1, BucketLength),
+            Key = case string:len(Uri) > BucketLength + 2 of
+                      true ->
+                          string:substr(Uri, BucketLength + 2);
+                      false ->
+                          none
+                  end
+    end,
     io:format("Method: ~p Bucket: ~s Key: ~p~n", [Method, Bucket, Key]),
     handle(Req, {Method, Bucket, Key}).
+
+handle(Req, {'GET', none, none}) ->
+    Req:ok(lists:flatten(["<ListAllMyBucketsResult xmlns='http://doc.s3.amazonaws.com/2006-03-01'>",
+                          "<Owner><ID>foo</ID><DisplayName>bar</DisplayName></Owner>",
+                          "<Buckets>",
+                           [["<Bucket>",
+                             "<Name>", Obj#bucket.index, "</Name>"
+                             "<CreationDate>2006-02-03T16:45:09.000Z</CreationDate>",
+                             "</Bucket>"] || Obj <- bucket:all()],
+                          "</Buckets></ListAllMyBucketsResult>"]));
+
 
 % note: amazon seems to crop max-keys before computing common prefixes
 % fixme: add test for dealing with delimiter being first char of key
@@ -195,6 +212,12 @@ hex(N) when N >= 10, N < 16 ->
 
 extract('Content-Type', V) ->
     {'Content-Type', V};
+
+extract('Date', V) ->
+    {'Date', V};
+
+extract('Content-Md5', V) ->
+    {'Content-Md5', V};
 
 extract("X-Amz-Meta-" ++ K, V) ->
     {"x-amz-meta-" ++ K, V};

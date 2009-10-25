@@ -4,9 +4,11 @@
          delete/1,
          first_run/0,
          start/0,
+         all/0,
          stop/0]).
 
--record(bucket, {index, owner}).
+-include("/usr/lib/erlang/lib/stdlib-1.16.2/include/qlc.hrl").
+-include("s2.hrl").
 
 start() ->
     ok = mnesia:start(),
@@ -36,6 +38,15 @@ fetch(Id) ->
         {atomic, [Bucket]} ->
             Bucket#bucket.owner
     end.
+
+all() ->
+    {atomic, Results} = mnesia:transaction(
+                          fun() ->
+                                  qlc:eval( qlc:q(
+                                              [ X || X <- mnesia:table(bucket) ]
+                                             ))
+                          end ),
+    Results.
 
 insert(Bucket, Owner) ->
     Fun = fun() ->
