@@ -54,8 +54,18 @@ handle(Req, {'GET', Bucket, none}) ->
         not_found ->
             Req:respond(404, "No Such Bucket");
         _ ->
-            Contents = string:join([io_lib:format("<Contents><Key>~p</Key></Contents>", [Obj#object.key]) || Obj <- meta:fetch(Bucket)], ""),
-            Req:ok(io_lib:format("<?xml version='1.0' encoding='UTF-8'?><ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'><Name>~s</Name><Prefix></Prefix><Marker></Marker><MaxKeys>0</MaxKeys><IsTruncated>false</IsTruncated>~s</ListBucketResult>", [Bucket, Contents]))
+            Contents = lists:flatten([["<Contents><Key>",
+                                       Obj#object.key,
+                                       "</Key></Contents>"] || Obj <- meta:fetch(Bucket)]),
+            Req:ok(lists:flatten(["<?xml version='1.0' encoding='UTF-8'?>",
+                                  "<ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'>",
+                                  "<Name>", Bucket, "</Name>",
+                                  "<Prefix></Prefix>",
+                                  "<Marker></Marker>",
+                                  "<MaxKeys>0</MaxKeys>",
+                                  "<IsTruncated>false</IsTruncated>",
+                                  Contents,
+                                  "</ListBucketResult>"]))
     end;
 
 handle(Req, {'GET', Bucket, Key}) ->
