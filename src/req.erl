@@ -109,7 +109,7 @@ handle(Req, {'GET', Bucket, Key}) ->
         not_found ->
             Req:respond(404, "");
         Headers ->
-            Req:ok(Headers, storage:fetch(Bucket, Key))
+            Req:file_send(storage:fetch(Bucket, Key), Headers)
     end;
 
 handle(Req, {'HEAD', Bucket, Key}) ->
