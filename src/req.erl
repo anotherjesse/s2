@@ -125,12 +125,12 @@ handle(Req, {'HEAD', Bucket, Key}) ->
     end;
 
 handle(Req, {'DELETE', Bucket, none}) ->
-    bucket:delete(Bucket),
+    mogilefs:delete_domain(Bucket),
     Req:respond(204, "");
 
 handle(Req, {'DELETE', Bucket, Key}) ->
     meta:delete(Bucket, Key),
-    storage:delete(Bucket, Key),
+    mogilefs:delete(Bucket, Key),
     Req:respond(204, "");
 
 handle(Req, {'PUT', Bucket, none}) ->

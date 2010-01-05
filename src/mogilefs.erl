@@ -15,6 +15,13 @@ check_domain(Domain) ->
 			not_found
 		end.
 
+
+delete_domain(Domain) ->
+	do_request("delete_domain", [{domain, Domain}]).
+
+delete(Domain, Key) ->
+	do_request("delete", [{domain, Domain}, {key, Key}]).
+
 get_paths(Domain, Key) ->
 	do_request("get_paths", [{domain, Domain}, {key, Key}]).
 
