@@ -58,9 +58,9 @@ handle(Req, {'GET', none, none}) ->
                           "<Owner><ID>foo</ID><DisplayName>bar</DisplayName></Owner>",
                           "<Buckets>",
                            [["<Bucket>",
-                             "<Name>", Obj#bucket.index, "</Name>"
+                             "<Name>", Domain, "</Name>"
                              "<CreationDate>2006-02-03T16:45:09.000Z</CreationDate>",
-                             "</Bucket>"] || Obj <- bucket:all()],
+                             "</Bucket>"] || Domain <- mogilefs:get_domains()],
                           "</Buckets></ListAllMyBucketsResult>"]));
 
 
@@ -76,7 +76,7 @@ handle(Req, {'GET', Bucket, none}) ->
                       list_to_integer(N)
               end,
     io:format("Prefix: ~s Delimiter: ~s MaxKeys ~p~n", [Prefix, Delimiter, MaxKeys]),
-    case bucket:fetch(Bucket) of
+    case mogilefs:check_domain(Bucket) of
         not_found ->
             Req:respond(404, "No Such Bucket");
         _ ->
@@ -130,13 +130,13 @@ handle(Req, {'DELETE', Bucket, Key}) ->
     Req:respond(204, "");
 
 handle(Req, {'PUT', Bucket, none}) ->
-    bucket:insert(Bucket, none),
+    ok = mogilefs:create_domain(Bucket),
     Req:ok("success");
 
 handle(Req, {'PUT', Bucket, Key}) ->
     meta:insert(Bucket, Key, Req),
     Content = Req:get(body),
-    storage:insert(Bucket, Key, Content),
+    mogilefs:new_file(Bucket, Key, Content),
     Req:ok([{"ETag", "\"" ++ md5:hex_digest(Content) ++ "\""}], "success");
 
 handle(Req, {Method, Bucket, Key}) ->
@@ -167,7 +167,6 @@ code_change(_OldVersion, State, _Extra) ->
 
 start() ->
     meta:start(),
-    storage:start(),
     bucket:start(),
     req:start_link(),
     req:start_http(1234),
@@ -176,7 +175,6 @@ start() ->
 first_run() ->
     io:format("Building tables~n"),
     meta:first_run(),
-    storage:first_run(),
     bucket:first_run().
 
 

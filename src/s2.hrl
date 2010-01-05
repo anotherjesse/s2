@@ -5,6 +5,3 @@
                  etag,
                  last_modified,
                  headers}).
-
--record(bucket, {index,
-                 owner}).
