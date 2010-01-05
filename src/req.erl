@@ -109,7 +109,11 @@ handle(Req, {'GET', Bucket, Key}) ->
         not_found ->
             Req:respond(404, "");
         Headers ->
-            Req:file_send(storage:fetch(Bucket, Key), Headers)
+			{ ok, Paths } = mogilefs:get_paths(Bucket, Key),
+			io:format("Got Paths ~p~n", [Paths]),
+		    { ok, {{_, _StatusCode, _}, _Headers, Body }} = http:request(proplists:get_value("path1", Paths)),
+			io:format("Got Body ~p~n", [Body]),
+            Req:ok(Headers, Body)
     end;
 
 handle(Req, {'HEAD', Bucket, Key}) ->
@@ -130,13 +134,17 @@ handle(Req, {'DELETE', Bucket, Key}) ->
     Req:respond(204, "");
 
 handle(Req, {'PUT', Bucket, none}) ->
-    ok = mogilefs:create_domain(Bucket),
+    {ok, _} = mogilefs:create_domain(Bucket),
     Req:ok("success");
 
 handle(Req, {'PUT', Bucket, Key}) ->
     meta:insert(Bucket, Key, Req),
+	Size = proplists:get_value('Content-Length', Req:get(headers)),
     Content = Req:get(body),
-    mogilefs:new_file(Bucket, Key, Content),
+    {ok, Create} = mogilefs:create_open(Bucket, Key),
+	Path = proplists:get_value("path", Create),
+	Result = http:request(put, {Path, [], "text/plain", Content}, [], []),
+	{ok, _} = mogilefs:create_close(Bucket, Key, Create, Size),
     Req:ok([{"ETag", "\"" ++ md5:hex_digest(Content) ++ "\""}], "success");
 
 handle(Req, {Method, Bucket, Key}) ->
@@ -166,16 +174,15 @@ code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
 
 start() ->
+	application:start(inets),
     meta:start(),
-    bucket:start(),
     req:start_link(),
     req:start_http(1234),
     io:format("Listening on 1234~n").
 
 first_run() ->
     io:format("Building tables~n"),
-    meta:first_run(),
-    bucket:first_run().
+    meta:first_run().
 
 
 date_fmt(DateTime) ->

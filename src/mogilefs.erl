@@ -9,15 +9,22 @@ check_domain(Domain) ->
 	case do_request("list_keys", [{domain, Domain}, {limit, 1}]) of
 		{ok, _} ->  % bucket with keys
 			ok;
-		{err, none_match, _} -> % bucket with no keys
+		{err, "none_match", _} -> % bucket with no keys
 			ok;
 		_ ->
 			not_found
 		end.
 
-new_file(Domain, Key, Content) ->
-	do_request("create_open", [{domain, Domain}, {key, Key}]).
+get_paths(Domain, Key) ->
+	do_request("get_paths", [{domain, Domain}, {key, Key}]).
 
+create_open(Domain, Key) ->
+	do_request("create_open", [{domain, Domain}, {key, Key}]).
+	
+create_close(Domain, Key, Create, Size) ->
+	do_request("create_close", Create ++ [{domain, Domain},
+								{key, Key},
+								{size, Size}]).    
 
 % sock() -> tcp socket to communicate to mogilefs tracker
 sock() ->
@@ -29,11 +36,13 @@ sock() ->
 % @doc  perform a request against new socket to mogilefs tracker, then parse results returning to caller
 % FIXME: should recv data until it hits \r\n
 do_request(Method, Options) ->
+	io:format("REQUEST: ~p~n", [mog_encode(Method, Options)]),
 	Sock = sock(),
 	ok = gen_tcp:send(Sock, mog_encode(Method, Options)),
 	{ok, Data} = gen_tcp:recv(Sock, 0),
+	Stripped = string:strip(string:strip(Data, both, $\n), both, $\r),
     ok = gen_tcp:close(Sock),
-	mog_decode(Data).
+	mog_decode(Stripped).
 
 % @spec mog_encode(string() | binary(), Options) -> string()
 % @doc  encode a command and options dictionary into a string to be sent over the wire
@@ -43,6 +52,7 @@ mog_encode(Method, Options) ->
 
 % @spec mog_decode(string()) -> {ok, Dictionary} | {err, code, message}
 % @doc  decode encoded response from a mogilefs request into an object
+% FIXME - string the \r\n off the end of the response
 mog_decode("OK " ++ String) ->
 	mog_decode(ok, String);
 
