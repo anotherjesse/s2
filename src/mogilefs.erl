@@ -2,59 +2,58 @@
 
 -compile(export_all).
 
--define(SERVER, global:whereis_name(?MODULE)).
-
-test() ->
-	do_request("stats", "all=1").
-
-% 
-% sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-% sock.setblocking(0)
-% sock.connect_ex(Ip, Port)
-% 
-sock() ->
-    {ok, Sock} = gen_tcp:connect("10.0.0.11", 6001, 
-                                 [list, {active, false}, {packet, 0}]),
-	Sock.
-
 create_domain(Domain) ->
-	"OK" ++ _ = do_request("create_domain", io_lib:format("domain=~s", [Domain])),
-	ok.
-	
+	do_request("create_domain", [{domain, Domain}]).
+
 check_domain(Domain) ->
-	case do_request("list_keys", "domain=" ++ Domain ++ "&limit=1") of
-		"OK" ++ _ ->  % bucket with keys
-			true;
-		"ERR none_match" ++ _ -> % bucket with no keys
-			 true;
+	case do_request("list_keys", [{domain, Domain}, {limit, 1}]) of
+		{ok, _} ->  % bucket with keys
+			ok;
+		{err, none_match, _} -> % bucket with no keys
+			ok;
 		_ ->
 			not_found
 		end.
 
 new_file(Domain, Key, Content) ->
-	do_request("create_open", "domain=" ++ Domain ++ "&key=" ++ Key).
+	do_request("create_open", [{domain, Domain}, {key, Key}]).
 
-% argstr = self._encode_url_string(args); 
-% sock.sendall(req, self.FLAG_NOSIGNAL)
+
+% sock() -> tcp socket to communicate to mogilefs tracker
+sock() ->
+    {ok, Sock} = gen_tcp:connect("10.0.0.11", 6001, 
+                                 [list, {active, false}, {packet, 0}]),
+	Sock.
+
+% @spec do_request(string() | binary(), Options) -> {ok, Objects} | {err, Code, Message}
+% @doc  perform a request against new socket to mogilefs tracker, then parse results returning to caller
+% FIXME: should recv data until it hits \r\n
 do_request(Method, Options) ->
 	Sock = sock(),
-	io:format("sending: ~p~n", [encode(Method, Options)]),
-	ok = gen_tcp:send(Sock, encode(Method, Options)),
+	ok = gen_tcp:send(Sock, mog_encode(Method, Options)),
 	{ok, Data} = gen_tcp:recv(Sock, 0),
-	io:format("Recv: ~p~n", [Data]),
     ok = gen_tcp:close(Sock),
-	Data.    
+	mog_decode(Data).
 
-% req = "%s %s\r\n" % (cmd, argstr)
-encode(Method, Options) ->
-	lists:flatten([Method, " ", Options, "\r\n"]).
+% @spec mog_encode(string() | binary(), Options) -> string()
+% @doc  encode a command and options dictionary into a string to be sent over the wire
+mog_encode(Method, Options) ->
+	lists:flatten([Method, " ", mochiweb_util:urlencode(Options), "\r\n"]).
 
-    % def _encode_url_string(self, args):
-    %     return "&".join(
-    %         ["%s=%s" % (
-    %                     quote_plus(str(k)),
-    %                     quote_plus(str(v))
-    %                    ) 
-    %         for k,v in args.items() if v]
-    %     )
 
+% @spec mog_decode(string()) -> {ok, Dictionary} | {err, code, message}
+% @doc  decode encoded response from a mogilefs request into an object
+mog_decode("OK " ++ String) ->
+	mog_decode(ok, String);
+
+mog_decode("ERR " ++ String) ->
+	mog_decode(err, String).
+
+mog_decode(err, String) ->
+	{match, [{Split, 1}]} = regexp:matches(String, " "),
+    Code = string:substr(String, 1, Split-1),
+    Reason = mochiweb_util:unquote(string:substr(String, Split+1, string:len(String) - Split - 2)),
+	{err, Code, Reason};
+
+mog_decode(ok, String) ->
+	{ok, mochiweb_util:parse_qs(String)}.
