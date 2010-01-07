@@ -52,7 +52,6 @@ class S3ConnectionTest (unittest.TestCase):
         
 
     def test_1_basic(self):
-        print '--- running S3Connection tests ---'
         c = self.conn
         # now try a get_bucket call and see if it's really there
         bucket = c.get_bucket(self.bucket.name)
@@ -106,25 +105,6 @@ class S3ConnectionTest (unittest.TestCase):
         assert k.content_type == phony_mimetype
         k = bucket.lookup('notthere')
         assert k == None
-        # try some metadata stuff
-        k = bucket.new_key()
-        k.name = 'has_metadata'
-        mdkey1 = 'meta1'
-        mdval1 = 'This is the first metadata value'
-        k.set_metadata(mdkey1, mdval1)
-        mdkey2 = 'meta2'
-        mdval2 = 'This is the second metadata value'
-        k.set_metadata(mdkey2, mdval2)
-        k.set_contents_from_string(s1)
-        k = bucket.lookup('has_metadata')
-        assert k.get_metadata(mdkey1) == mdval1
-        assert k.get_metadata(mdkey2) == mdval2
-        k = bucket.new_key()
-        k.name = 'has_metadata'
-        k.get_contents_as_string()
-        assert k.get_metadata(mdkey1) == mdval1
-        assert k.get_metadata(mdkey2) == mdval2
-        bucket.delete_key(k)
         # try a key with a funny character
         rs = bucket.get_all_keys()
         num_keys = len(rs)
@@ -136,7 +116,31 @@ class S3ConnectionTest (unittest.TestCase):
         bucket.delete_key(k)
         rs = bucket.get_all_keys()
         assert len(rs) == num_keys
-        # try some acl stuff
+        
+    def test_meta_data(self):
+        bucket = self.bucket
+        # try some metadata stuff
+        k = bucket.new_key()
+        k.name = 'has_metadata'
+        mdkey1 = 'meta1'
+        mdval1 = 'This is the first metadata value'
+        k.set_metadata(mdkey1, mdval1)
+        mdkey2 = 'meta2'
+        mdval2 = 'This is the second metadata value'
+        k.set_metadata(mdkey2, mdval2)
+        k.set_contents_from_string('content')
+        k = bucket.lookup('has_metadata')
+        assert k.get_metadata(mdkey1) == mdval1
+        assert k.get_metadata(mdkey2) == mdval2
+        k = bucket.new_key()
+        k.name = 'has_metadata'
+        k.get_contents_as_string()
+        assert k.get_metadata(mdkey1) == mdval1
+        assert k.get_metadata(mdkey2) == mdval2
+        bucket.delete_key(k)
+    
+        
+    # def test_acl(self):
         # bucket.set_acl('public-read')
         # policy = bucket.get_acl()
         # assert len(policy.acl.grants) == 2
