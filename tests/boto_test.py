@@ -34,6 +34,8 @@ from boto.exception import S3PermissionsError
 
 class S3ConnectionTest (unittest.TestCase):
     
+    # NOTE: setUp/tearDown is run around each test - seems overkill
+    
     def setUp(self):
         self.conn = S3Connection(aws_secret_access_key="foo",
                                  aws_access_key_id="bar",
@@ -105,17 +107,18 @@ class S3ConnectionTest (unittest.TestCase):
         assert k.content_type == phony_mimetype
         k = bucket.lookup('notthere')
         assert k == None
-        # try a key with a funny character
-        rs = bucket.get_all_keys()
-        num_keys = len(rs)
+
+    def test_funny_characters(self):
+        bucket = self.bucket
+        orig_num_keys = len(bucket.get_all_keys())
         k = bucket.new_key()
         k.name = 'testnewline\n'
         k.set_contents_from_string('This is a test')
         rs = bucket.get_all_keys()
-        assert len(rs) == num_keys + 1
+        assert len(rs) == orig_num_keys + 1
         bucket.delete_key(k)
         rs = bucket.get_all_keys()
-        assert len(rs) == num_keys
+        assert len(rs) == orig_num_keys
         
     def test_meta_data(self):
         bucket = self.bucket
