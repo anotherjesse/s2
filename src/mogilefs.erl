@@ -25,6 +25,10 @@ delete(Domain, Key) ->
 get_paths(Domain, Key) ->
 	do_request("get_paths", [{domain, Domain}, {key, Key}]).
 
+get_domains() ->
+	{ok, R} = do_request("get_domains", []),
+	[ V || {K, V} <- R, nomatch == re:run(K, "^domain[0-9]+[^0-9]")].
+
 create_open(Domain, Key) ->
 	do_request("create_open", [{domain, Domain}, {key, Key}]).
 	
