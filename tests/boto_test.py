@@ -33,21 +33,29 @@ from boto.s3.connection import S3Connection
 from boto.exception import S3PermissionsError
 
 class S3ConnectionTest (unittest.TestCase):
+    
+    def setUp(self):
+        self.conn = S3Connection(aws_secret_access_key="foo",
+                                 aws_access_key_id="bar",
+                                 is_secure=False,
+                                 debug=1,
+                                 port=1234,
+                                 host="localhost",
+                                 calling_format=boto.s3.connection.OrdinaryCallingFormat())
+        bucket_name = 'test-%d' % int(time.time())
+        self.bucket = self.conn.create_bucket(bucket_name)
+    
+    def tearDown(self):
+        for k in self.bucket.get_all_keys():
+            self.bucket.delete_key(k)
+        self.conn.delete_bucket(self.bucket)
+        
 
     def test_1_basic(self):
         print '--- running S3Connection tests ---'
-        c = S3Connection(aws_secret_access_key="foo",
-                         aws_access_key_id="bar",
-                         is_secure=False,
-                         debug=2,
-                         port=1234,
-                         host="localhost",
-                         calling_format=boto.s3.connection.OrdinaryCallingFormat())
-        # create a new, empty bucket
-        bucket_name = 'test-%d' % int(time.time())
-        bucket = c.create_bucket(bucket_name)
+        c = self.conn
         # now try a get_bucket call and see if it's really there
-        bucket = c.get_bucket(bucket_name)
+        bucket = c.get_bucket(self.bucket.name)
         # create a new key and store it's content from a string
         k = bucket.new_key()
         k.name = 'foobar'
@@ -128,7 +136,6 @@ class S3ConnectionTest (unittest.TestCase):
         bucket.delete_key(k)
         rs = bucket.get_all_keys()
         assert len(rs) == num_keys
-        print "ACL TESTS DISABLED!"
         # try some acl stuff
         # bucket.set_acl('public-read')
         # policy = bucket.get_acl()
@@ -150,9 +157,14 @@ class S3ConnectionTest (unittest.TestCase):
         #     bucket.add_email_grant('foobar', 'foo@bar.com')
         # except S3PermissionsError:
         #     pass
-        # now delete all keys in bucket
-        for k in all:
-            bucket.delete_key(k)
-        # now delete bucket
-        c.delete_bucket(bucket)
-        print '--- tests completed ---'
+
+    def test_2_1mb_upload(self):
+        k = self.bucket.new_key()
+        k.name = 'foobar'
+        k.set_contents_from_filename("1mb")
+        fp = open('foobar', 'wb')
+        k.get_contents_to_file(fp)
+        fp.close()
+        # check to make sure content read from s3 is identical to original
+        assert open('foobar').read() == open('1mb').read()
+        

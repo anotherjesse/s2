@@ -113,7 +113,10 @@ handle(Req, {'GET', Bucket, Key}) ->
 			io:format("Got Paths ~p~n", [Paths]),
 		    { ok, {{_, _StatusCode, _}, _Headers, Body }} = http:request(proplists:get_value("path1", Paths)),
 			io:format("Got Body ~p~n", [Body]),
-            Req:ok(Headers, Body)
+			Req:stream(head, Headers),
+			Req:stream(Body),
+			Req:stream(close)
+            % Req:ok(Headers, Body)
     end;
 
 handle(Req, {'HEAD', Bucket, Key}) ->
