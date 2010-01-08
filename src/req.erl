@@ -109,14 +109,11 @@ handle(Req, {'GET', Bucket, Key}) ->
         not_found ->
             Req:respond(404, "");
         Headers ->
-			{ ok, Paths } = mogilefs:get_paths(Bucket, Key),
-			io:format("Got Paths ~p~n", [Paths]),
-		    { ok, {{_, _StatusCode, _}, _Headers, Body }} = http:request(proplists:get_value("path1", Paths)),
-			io:format("Got Body ~p~n", [Body]),
-			Req:stream(head, Headers),
-			Req:stream(Body),
-			Req:stream(close)
-            % Req:ok(Headers, Body)
+            { ok, Paths } = mogilefs:get_paths(Bucket, Key),
+            { ok, {_Status, _Headers, Body }} = http:request(proplists:get_value("path1", Paths)),
+            Req:stream(head, Headers),
+            Req:stream(Body),
+            Req:stream(close)
     end;
 
 handle(Req, {'HEAD', Bucket, Key}) ->
@@ -142,12 +139,13 @@ handle(Req, {'PUT', Bucket, none}) ->
 
 handle(Req, {'PUT', Bucket, Key}) ->
     meta:insert(Bucket, Key, Req),
-	Size = proplists:get_value('Content-Length', Req:get(headers)),
+    Size = proplists:get_value('Content-Length', Req:get(headers)),
+    io:format("Upload size: ~p~n", [Size]),
     Content = Req:get(body),
     {ok, Create} = mogilefs:create_open(Bucket, Key),
-	Path = proplists:get_value("path", Create),
-	Result = http:request(put, {Path, [], "text/plain", Content}, [], []),
-	{ok, _} = mogilefs:create_close(Bucket, Key, Create, Size),
+    Path = proplists:get_value("path", Create),
+    Result = http:request(put, {Path, [], "text/plain", Content}, [], []),
+    {ok, _} = mogilefs:create_close(Bucket, Key, Create, Size),
     Req:ok([{"ETag", "\"" ++ md5:hex_digest(Content) ++ "\""}], "success");
 
 handle(Req, {Method, Bucket, Key}) ->
@@ -177,7 +175,7 @@ code_change(_OldVersion, State, _Extra) ->
     {ok, State}.
 
 start() ->
-	application:start(inets),
+    application:start(inets),
     meta:start(),
     req:start_link(),
     req:start_http(1234),
