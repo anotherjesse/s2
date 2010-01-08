@@ -42,9 +42,12 @@ loop(Req, _DocRoot) ->
                   end
     end,
     io:format("Method: ~s Bucket: ~s Key: ~p~n", [Method, Bucket, Key]),
-    handle(Req, {Method, Bucket, Key}).
-
-
+    Response = Req:ok({"text/html; charset=utf-8",
+                      [{"Server","Mochiweb-Test"}],
+                      chunked}),
+    Response:write_chunk("testing 1 2 3"),
+    Response:write_chunk("").
+    % handle(Req, {Method, Bucket, Key}).
 
 handle(Req, {'GET', none, none}) ->
     Req:ok([{'Content-Type', 'text/xml'}],
@@ -104,10 +107,13 @@ handle(Req, {'GET', Bucket, Key}) ->
             Req:respond(404, "");
         Headers ->
             { ok, Paths } = mogilefs:get_paths(Bucket, Key),
-            { ok, {_Status, _Headers, Body }} = http:request(proplists:get_value("path1", Paths)),
-            Req:start_response({200, Headers}),
-            Req:send(Body),
-            Req:stream(close)
+            { ok, _Status, Body} = http:request(proplists:get_value("path1", Paths)),
+            % FIXME: mimetype?
+            Response = Req:ok({"text/html; charset=utf-8",
+                              [{"Server","Mochiweb-Test"}],
+                              chunked}),
+            Response:write_chunk(Body),
+            Response:write_chunk("")
     end;
 
 handle(Req, {'HEAD', Bucket, Key}) ->
@@ -139,7 +145,7 @@ handle(Req, {'PUT', Bucket, Key}) ->
     Path = proplists:get_value("path", Create),
     % FIXME: Content should be read/sent via streaming...
     Content = Req:recv_body(),
-    Result = http:request(put, {Path, [], "text/plain", Content)}, [], []),
+    Result = http:request(put, {Path, [], "text/plain", Content}, [], []),
     {ok, _} = mogilefs:create_close(Bucket, Key, Create, Size),
     % FIXME: how do we get the ETAG then?
     Req:ok([{"ETag", "\"" ++ md5:hex_digest(Content) ++ "\""}], "success");
