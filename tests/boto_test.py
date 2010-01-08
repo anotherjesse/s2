@@ -29,12 +29,11 @@ import unittest
 import time
 import os
 import boto
+import random
 from boto.s3.connection import S3Connection
 from boto.exception import S3PermissionsError
 
 class S3ConnectionTest (unittest.TestCase):
-    
-    # NOTE: setUp/tearDown is run around each test - seems overkill
     
     def setUp(self):
         self.conn = S3Connection(aws_secret_access_key="foo",
@@ -44,14 +43,14 @@ class S3ConnectionTest (unittest.TestCase):
                                  port=1234,
                                  host="localhost",
                                  calling_format=boto.s3.connection.OrdinaryCallingFormat())
-        bucket_name = 'test-%d' % int(time.time())
+        bucket_name = 'test-%s-%d' % (random.random(), int(time.time()))
         self.bucket = self.conn.create_bucket(bucket_name)
+        self.fn = "foobar-%s" % random.random()
     
     def tearDown(self):
         for k in self.bucket.get_all_keys():
             self.bucket.delete_key(k)
         self.conn.delete_bucket(self.bucket)
-        
 
     def test_1_basic(self):
         c = self.conn
@@ -63,11 +62,11 @@ class S3ConnectionTest (unittest.TestCase):
         s1 = 'This is a test of file upload and download'
         s2 = 'This is a second string to test file upload and download'
         k.set_contents_from_string(s1)
-        fp = open('foobar', 'wb')
+        fp = open(self.fn, 'wb')
         # now get the contents from s3 to a local file
         k.get_contents_to_file(fp)
         fp.close()
-        fp = open('foobar')
+        fp = open(self.fn)
         # check to make sure content read from s3 is identical to original
         assert s1 == fp.read(), 'corrupted file'
         fp.close()
@@ -79,7 +78,7 @@ class S3ConnectionTest (unittest.TestCase):
         k.name = 'foo/bar'
         k.set_contents_from_string(s1, headers)
         k.name = 'foo/bas'
-        k.set_contents_from_filename('foobar')
+        k.set_contents_from_filename(self.fn)
         k.name = 'foo/bat'
         k.set_contents_from_string(s1)
         k.name = 'fie/bar'
@@ -92,7 +91,7 @@ class S3ConnectionTest (unittest.TestCase):
         md5 = k.md5
         k.set_contents_from_string(s2)
         assert k.md5 != md5
-        os.unlink('foobar')
+        os.unlink(self.fn)
         all = bucket.get_all_keys()
         assert len(all) == 6
         rs = bucket.get_all_keys(prefix='foo')
@@ -107,18 +106,17 @@ class S3ConnectionTest (unittest.TestCase):
         assert k.content_type == phony_mimetype
         k = bucket.lookup('notthere')
         assert k == None
-
-    def test_funny_characters(self):
-        bucket = self.bucket
-        orig_num_keys = len(bucket.get_all_keys())
+        # try a key with a funny character
+        rs = bucket.get_all_keys()
+        num_keys = len(rs)
         k = bucket.new_key()
         k.name = 'testnewline\n'
         k.set_contents_from_string('This is a test')
         rs = bucket.get_all_keys()
-        assert len(rs) == orig_num_keys + 1
+        assert len(rs) == num_keys + 1
         bucket.delete_key(k)
         rs = bucket.get_all_keys()
-        assert len(rs) == orig_num_keys
+        assert len(rs) == num_keys
         
     def test_meta_data(self):
         bucket = self.bucket
@@ -169,9 +167,8 @@ class S3ConnectionTest (unittest.TestCase):
         k = self.bucket.new_key()
         k.name = 'foobar'
         k.set_contents_from_filename("1mb")
-        fp = open('foobar', 'wb')
+        fp = open(self.fn, 'wb')
         k.get_contents_to_file(fp)
         fp.close()
         # check to make sure content read from s3 is identical to original
-        assert open('foobar').read() == open('1mb').read()
-        
+        assert open(self.fn).read() == open('1mb').read()
