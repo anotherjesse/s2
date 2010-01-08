@@ -1,4 +1,10 @@
+%% @author author <author@example.com>
+%% @copyright YYYY author.
+
+%% @doc mogilefs client implementation.
+
 -module(mogilefs).
+-author('Jesse Andrews <jesse@ang.st>').
 
 -compile(export_all).
 
@@ -45,11 +51,10 @@ sock() ->
 
 % @spec do_request(string() | binary(), Options) -> {ok, Objects} | {err, Code, Message}
 % @doc  perform a request against new socket to mogilefs tracker, then parse results returning to caller
-% FIXME: should recv data until it hits \r\n
 do_request(Method, Options) ->
-    io:format("REQUEST: ~p~n", [mog_encode(Method, Options)]),
     Sock = sock(),
     ok = gen_tcp:send(Sock, mog_encode(Method, Options)),
+    % FIXME: should recv data until it hits \r\n
     {ok, Data} = gen_tcp:recv(Sock, 0),
     Stripped = string:strip(string:strip(Data, both, $\n), both, $\r),
     ok = gen_tcp:close(Sock),
@@ -71,10 +76,20 @@ mog_decode("ERR " ++ String) ->
     mog_decode(err, String).
 
 mog_decode(err, String) ->
-    {match, [{Split, 1}]} = regexp:matches(String, " "),
+    {match, [{Split, 1}]} = re:run(String, " "),
     Code = string:substr(String, 1, Split-1),
     Reason = mochiweb_util:unquote(string:substr(String, Split+1, string:len(String) - Split - 2)),
     {err, Code, Reason};
 
 mog_decode(ok, String) ->
     {ok, mochiweb_util:parse_qs(String)}.
+    
+    
+    
+
+%%
+%% Tests
+%%
+-include_lib("eunit/include/eunit.hrl").
+-ifdef(TEST).
+-endif.
