@@ -6,7 +6,7 @@
 -module(s2_meta).
 -author('Jesse Andrews <jesse@ang.st>').
 
--export([insert/3,
+-export([insert/5,
          list/3,
          fetch/1,
          fetch/2,
@@ -73,17 +73,17 @@ fetch(Bucket, Key) ->
             Object#object.headers
     end.
 
-insert(Bucket, Key, Req) ->
+insert(Bucket, Key, Etag, Headers, Size) ->
     Id = Bucket ++ "/" ++ Key,
     Fun = fun() ->
                   mnesia:write(
                     #object{ index         = Id,
                              bucket        = Bucket,
                              key           = Key,
-                             etag          = md5:hex_digest(Req:get(body)),
-                             size          = Req:get(content_length),
+                             etag          = Etag, % md5:hex_digest(Req:get(body))
+                             size          = Size, % Req:get(content_length)
                              last_modified = calendar:universal_time(),
-                             headers       = lists:flatten([extract(K,V) || {K,V} <- Req:get(headers)])
+                             headers       = lists:flatten([extract(K,V) || {K,V} <- Headers]) % Req:get(headers)
                             })
           end,
     {atomic, Result} = mnesia:transaction(Fun),
@@ -118,12 +118,3 @@ extract("X-Amz-Meta-" ++ K, V) ->
 
 extract(_,_) ->
     [].
-
-
-
-%%
-%% Tests
-%%
--include_lib("eunit/include/eunit.hrl").
--ifdef(TEST).
--endif.

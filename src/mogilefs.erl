@@ -77,8 +77,8 @@ mog_decode("ERR " ++ String) ->
 
 mog_decode(err, String) ->
     {match, [{Split, 1}]} = re:run(String, " "),
-    Code = string:substr(String, 1, Split-1),
-    Reason = mochiweb_util:unquote(string:substr(String, Split+1, string:len(String) - Split - 2)),
+    Code = string:substr(String, 1, Split),
+    Reason = mochiweb_util:unquote(string:substr(String, Split+2, string:len(String) - Split - 1)),
     {err, Code, Reason};
 
 mog_decode(ok, String) ->

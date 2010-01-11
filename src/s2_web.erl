@@ -42,23 +42,23 @@ loop(Req, _DocRoot) ->
                   end
     end,
     io:format("Method: ~s Bucket: ~s Key: ~p~n", [Method, Bucket, Key]),
-    Response = Req:ok({"text/html; charset=utf-8",
-                      [{"Server","Mochiweb-Test"}],
-                      chunked}),
-    Response:write_chunk("testing 1 2 3"),
-    Response:write_chunk("").
-    % handle(Req, {Method, Bucket, Key}).
+    % Response = Req:ok({"text/html; charset=utf-8",
+    %                   [{"Server","Mochiweb-Test"}],
+    %                   chunked}),
+    % Response:write_chunk("testing 1 2 3"),
+    % Response:write_chunk("").
+    handle(Req, {Method, Bucket, Key}).
 
 handle(Req, {'GET', none, none}) ->
-    Req:ok([{'Content-Type', 'text/xml'}],
-           lists:flatten(["<ListAllMyBucketsResult xmlns='http://doc.s3.amazonaws.com/2006-03-01'>",
-                          "<Owner><ID>foo</ID><DisplayName>bar</DisplayName></Owner>",
-                          "<Buckets>",
-                           [["<Bucket>",
-                             "<Name>", Domain, "</Name>"
-                             "<CreationDate>2006-02-03T16:45:09.000Z</CreationDate>",
-                             "</Bucket>"] || Domain <- mogilefs:get_domains()],
-                          "</Buckets></ListAllMyBucketsResult>"]));
+    Req:ok({'text/xml',
+            lists:flatten(["<ListAllMyBucketsResult xmlns='http://doc.s3.amazonaws.com/2006-03-01'>",
+                           "<Owner><ID>foo</ID><DisplayName>bar</DisplayName></Owner>",
+                           "<Buckets>",
+                            [["<Bucket>",
+                              "<Name>", Domain, "</Name>"
+                              "<CreationDate>2006-02-03T16:45:09.000Z</CreationDate>",
+                              "</Bucket>"] || Domain <- mogilefs:get_domains()],
+                           "</Buckets></ListAllMyBucketsResult>"])});
 
 
 % note: amazon seems to crop max-keys before computing common prefixes
@@ -75,7 +75,7 @@ handle(Req, {'GET', Bucket, none}) ->
     io:format("Prefix: ~s Delimiter: ~s MaxKeys ~p~n", [Prefix, Delimiter, MaxKeys]),
     case mogilefs:check_domain(Bucket) of
         not_found ->
-            Req:respond(404, "No Such Bucket");
+            Req:not_found();
         _ ->
             [Keys, CommonPrefixes] = s2_meta:list(Bucket, Prefix, Delimiter),
             KeysXML = [["<Contents>",
@@ -87,18 +87,18 @@ handle(Req, {'GET', Bucket, none}) ->
             CommonPrefixesXML = [["<CommonPrefixes><Prefix>",
                                   CP,
                                   "</Prefix></CommonPrefixes>"] || CP <- CommonPrefixes],
-            Req:ok([{"Content-Type", "text/xml"}],
-                   lists:flatten(["<?xml version='1.0' encoding='UTF-8'?>",
-                                  "<ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'>",
-                                  "<Name>", Bucket, "</Name>",
-                                  "<Prefix>", Prefix, "</Prefix>",
-                                  "<Delimiter>", Delimiter, "</Delimiter>",
-                                  "<Marker></Marker>",
-                                  "<MaxKeys>1000</MaxKeys>",
-                                  "<IsTruncated>false</IsTruncated>",
-                                  KeysXML,
-                                  CommonPrefixesXML,
-                                  "</ListBucketResult>"]))
+            Req:ok({"text/xml",
+                    lists:flatten(["<?xml version='1.0' encoding='UTF-8'?>",
+                                   "<ListBucketResult xmlns='http://s3.amazonaws.com/doc/2006-03-01'>",
+                                   "<Name>", Bucket, "</Name>",
+                                   "<Prefix>", Prefix, "</Prefix>",
+                                   "<Delimiter>", Delimiter, "</Delimiter>",
+                                   "<Marker></Marker>",
+                                   "<MaxKeys>1000</MaxKeys>",
+                                   "<IsTruncated>false</IsTruncated>",
+                                   KeysXML,
+                                   CommonPrefixesXML,
+                                   "</ListBucketResult>"])})
     end;
 
 handle(Req, {'GET', Bucket, Key}) ->
@@ -119,39 +119,47 @@ handle(Req, {'GET', Bucket, Key}) ->
 handle(Req, {'HEAD', Bucket, Key}) ->
     case s2_meta:fetch(Bucket, Key) of
         not_found ->
-            Req:respond(404, "");
+            Req:not_found();
         Headers ->
-            Req:ok(Headers, "")
+            Req:ok({Headers, ""})
     end;
 
 handle(Req, {'DELETE', Bucket, none}) ->
     mogilefs:delete_domain(Bucket),
-    Req:respond(204, "");
+    Req:respond({204, [{"Content-Type", "text/xml"}], "<result>ok</result>"});
 
 handle(Req, {'DELETE', Bucket, Key}) ->
     s2_meta:delete(Bucket, Key),
     mogilefs:delete(Bucket, Key),
-    Req:respond(204, "");
+    Req:respond({204, [{"Content-Type", "text/xml"}], "<result>ok</result>"});
 
 handle(Req, {'PUT', Bucket, none}) ->
     {ok, _} = mogilefs:create_domain(Bucket),
-    Req:ok("success");
+    Req:ok({"text/xml", "<result>ok</result>"});
 
 handle(Req, {'PUT', Bucket, Key}) ->
-    s2_meta:insert(Bucket, Key, Req),
-    Size = proplists:get_value('Content-Length', Req:get(headers)),
-    io:format("Upload size: ~p~n", [Size]),
-    {ok, Create} = mogilefs:create_open(Bucket, Key),
-    Path = proplists:get_value("path", Create),
-    % FIXME: Content should be read/sent via streaming...
+    io:format("line 1~n"),
     Content = Req:recv_body(),
+    Etag = md5:hex_digest(Content),
+    Headers = Req:get(headers),
+    Size = Req:get_header_value("content-length"),
+    s2_meta:insert(Bucket, Key, Etag, Headers, Size),
+    io:format("line 2~n"),
+    io:format("Upload size: ~p~n", [Size]),
+    io:format("line 4~n"),
+    {ok, Create} = mogilefs:create_open(Bucket, Key),
+    io:format("line 5~n"),
+    Path = proplists:get_value("path", Create),
+    io:format("line 6~n"),
+    io:format("line 7~n"),
     Result = http:request(put, {Path, [], "text/plain", Content}, [], []),
+    io:format("line 8~n"),
     {ok, _} = mogilefs:create_close(Bucket, Key, Create, Size),
-    % FIXME: how do we get the ETAG then?
-    Req:ok([{"ETag", "\"" ++ md5:hex_digest(Content) ++ "\""}], "success");
+    io:format("line 9~n"),
+    Req:ok({"text/xml", [{"ETag", "\"" ++ Etag ++ "\""}], "<result>success</result>"});
 
 handle(Req, {Method, Bucket, Key}) ->
-    Req:respond(501, io_lib:format("Haven't handled ~p ~p ~p~n", [Method, Bucket, Key])).
+    Req:respond({501, "text/xml", io_lib:format("<result>Haven't handled ~p ~p ~p</result>", [Method, Bucket, Key])}).
 
 %% Internal API
 
